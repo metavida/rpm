@@ -37,6 +37,24 @@ DependencyDetection.defer do
 
   executes do
     ActionController::Base.class_eval do
+      add_method_tracer :render, 'View/#{newrelic_metric_path}/Rendering'
+
+      include NewRelic::Agent::Instrumentation::ControllerInstrumentation
+
+      # Compare with #alias_method_chain, which is not available in
+      # Rails 1.1:
+      alias_method :perform_action_without_newrelic_trace, :perform_action
+      alias_method :perform_action, :perform_action_with_newrelic_trace
+      private :perform_action
+
+      def self.newrelic_write_attr(attr_name, value) # :nodoc:
+        write_inheritable_attribute(attr_name, value)
+      end
+
+      def self.newrelic_read_attr(attr_name) # :nodoc:
+        read_inheritable_attribute(attr_name)
+      end
+
       # determine the path that is used in the metric name for
       # the called controller action
       def newrelic_metric_path(action_name_override = nil)
@@ -47,8 +65,6 @@ DependencyDetection.defer do
           "#{self.class.controller_path}/(other)"
         end
       end
-
-      add_method_tracer :render, 'View/#{newrelic_metric_path}/Rendering'
     end
 
   end
